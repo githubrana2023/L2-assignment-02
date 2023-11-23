@@ -1,10 +1,18 @@
 import zod from "zod"
 import cors from "cors"
 import express, { Request, Response, Router } from "express"
-import { Model, Schema, model } from "mongoose"
+import dotenv from "dotenv"
+import mongoose, { Model, Schema, model } from "mongoose"
+
+
+
+dotenv.config()
 
 
 const app = express()
+
+
+const mongodb_url = process.env.MONGODB_URL as string
 
 
 const usersRoutes = Router()
@@ -261,6 +269,23 @@ usersRoutes.get('/:userId/orders/total-price', (req: Request, res: Response) => 
 })
 
 
-app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`)
-})
+
+
+
+const connectDb = async () => {
+    try {
+        await mongoose.connect(mongodb_url)
+        app.listen(port, () => {
+            console.log({
+                db: 'database connection established with server',
+                server: `server listening on port ${port}`
+            })
+        })
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+connectDb()
+
+
