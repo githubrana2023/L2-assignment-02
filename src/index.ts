@@ -1,6 +1,7 @@
 import zod from "zod"
 import cors from "cors"
-import express, { Request, Response, Router } from "express"
+import bcrypt from "bcryptjs"
+import express, { NextFunction, Request, Response, Router } from "express"
 import dotenv from "dotenv"
 import mongoose, { Model, Schema, model } from "mongoose"
 
@@ -13,10 +14,10 @@ const app = express()
 
 
 const mongodb_url = process.env.MONGODB_URL as string
+const port = process.env.PORT as string || 5000
 
 
 const usersRoutes = Router()
-const port = 3000
 
 
 
@@ -28,6 +29,10 @@ app.use(cors())
 app.use('/api/users', usersRoutes)
 
 
+
+
+
+//! utils or helper functions
 
 
 
@@ -55,7 +60,7 @@ const ordersSchemaValidation = zod.object({
 })
 
 const usersSchemaValidation = zod.object({
-    userId: zod.number().min(3, { message: 'Please enter user id at least 3 digits' }).max(5, { message: 'User id cannot be more than 5 digits' }),
+    userId: zod.number(),
     username: zod.string().min(3, { message: 'Please enter username at least 3 character' }).max(15, { message: 'Username cannot be more than 15 characters' }).trim(),
     password: zod.string().min(3, { message: 'Please enter password at least 6 characters' }).max(16, { message: 'Password cannot be more than 16 characters' }),
     fullName: fullNameSchemaValidation,
@@ -85,7 +90,7 @@ type TUsers = zod.infer<typeof usersSchemaValidation>
 
 
 interface IUsersModel extends Model<TUsers> {
-    isUserExist(userId: string): Promise<TUsers | null>
+    isUserExist(email: string): Promise<TUsers | null>
 }
 
 
@@ -166,8 +171,6 @@ const UserSchema = new Schema<TUsers, IUsersModel>({
     userId: {
         type: 'Number',
         required: [true, 'Please check your user id fields.'],
-        min: [3, 'User id must be at least 3 digits.'],
-        max: [5, 'User id cannot be more than 5 digits.'],
         unique: true,
     },
     username: {
@@ -208,12 +211,17 @@ const UserSchema = new Schema<TUsers, IUsersModel>({
 })
 
 
-UserSchema.statics.isUserExist = async function (userId: string): Promise<TUsers | null> {
-
-    return await User.findOne({ userId })
-
+UserSchema.statics.isUserExist = async function (email: string): Promise<TUsers | null> {
+    return await User.findOne({ email })
 }
 
+//! mongoose pre middleware
+UserSchema.pre('save', async function () {
+    const salt = await bcrypt.genSalt(10)
+    const hashedPassword = await bcrypt.hash(this.password, salt)
+
+    this.password = hashedPassword
+})
 
 
 
@@ -232,8 +240,53 @@ app.get('/', (req: Request, res: Response) => {
 
 
 
-usersRoutes.post('/', (req: Request, res: Response) => {
-    return res.send('Hello World! from users POST request create method')
+usersRoutes.post('/', async (req: Request, res: Response, next: NextFunction) => {
+
+    try {
+        const userData: TUsers = req.body
+        const validated = usersSchemaValidation.safeParse(userData)
+
+        if (!validated.success) {
+            return res.status(400).json({
+                success: false,
+                message: validated.error.issues.map(errorObj => `${errorObj.message === 'Required' ? errorObj.path[0] + " is " + errorObj.message : errorObj.message}`).toString(),
+                error: {
+                    code: 400,
+                    description: 'User validation failed',
+                }
+            })
+        }
+
+        const isExist = await User.isUserExist(userData.email)
+
+        if (isExist) {
+            return res.status(200).json({
+                "success": false,
+                "message": "User already exist!",
+                "error": {
+                    "code": 200,
+                    "description": "User already exist!"
+                }
+            })
+        }
+
+        const response = await User.create(validated.data)
+
+        return res.status(201).json({
+            success: true,
+            message: 'User created successfully',
+            data: response
+        })
+    } catch (error) {
+        next(error)
+    }
+
+
+
+
+
+
+
 })
 usersRoutes.get('/', (req: Request, res: Response) => {
     return res.send('Hello World! from users GET request find method')
@@ -267,6 +320,24 @@ usersRoutes.get('/:userId/orders', (req: Request, res: Response) => {
 usersRoutes.get('/:userId/orders/total-price', (req: Request, res: Response) => {
     return res.send('Hello World! from users GET request find single user total order price method')
 })
+
+
+
+
+//! global error handler middleware
+
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+    console.log(error);
+    res.status(500).json({
+        "success": false,
+        "message": error.message || 'something went wrong',
+        "error": {
+            "code": 500,
+            "description": "internal error"
+        }
+    })
+})
+
 
 
 
