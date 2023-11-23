@@ -236,8 +236,15 @@ const User = model<TUsers, IUsersModel>('User', UserSchema)
 // =============================================================
 
 
-app.get('/', (req: Request, res: Response) => {
-    res.send('Hello World!')
+app.get('/', (req: Request, res: Response,next:NextFunction) => {
+    try {
+        return res.status(200).json({
+            success: true,
+            message: 'server successfully running... Ping Pong😍😁'
+        })
+    } catch (error) {
+        next(error)
+    }
 })
 
 
