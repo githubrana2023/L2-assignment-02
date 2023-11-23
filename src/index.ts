@@ -84,6 +84,39 @@ app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!')
 })
 
+
+
+usersRoutes.post('/', (req: Request, res: Response) => {
+    return res.send('Hello World! from users POST request create method')
+})
+usersRoutes.get('/', (req: Request, res: Response) => {
+    return res.send('Hello World! from users GET request find method')
+})
+usersRoutes.get('/:userId', (req: Request, res: Response) => {
+    return res.send('Hello World! from users GET request find single user method')
+})
+usersRoutes.put('/:userId', (req: Request, res: Response) => {
+    return res.send('Hello World! from users GET request update single user method')
+})
+usersRoutes.delete('/:userID', (req: Request, res: Response) => {
+    return res.send('Hello World! from users GET request delete single user method')
+})
+
+
+// !api for orders
+usersRoutes.put('/:userId/orders', (req: Request, res: Response) => {
+    return res.send('Hello World! from users GET request update single user orders array method')
+})
+
+usersRoutes.get('/:userId/orders', (req: Request, res: Response) => {
+    return res.send('Hello World! from users GET request find single user all orders method')
+})
+
+usersRoutes.get('/:userId/orders/total-price', (req: Request, res: Response) => {
+    return res.send('Hello World! from users GET request find single user total order price method')
+})
+
+
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
 })
