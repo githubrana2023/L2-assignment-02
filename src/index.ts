@@ -3,9 +3,7 @@ import cors from "cors"
 import bcrypt from "bcryptjs"
 import express, { NextFunction, Request, Response, Router } from "express"
 import dotenv from "dotenv"
-import mongoose, { Model, Query, Schema, model } from "mongoose"
-import { Document } from "mongodb"
-import { idText } from "typescript"
+import mongoose, { Model, Query, Schema, model, Document } from "mongoose"
 
 
 
@@ -29,14 +27,6 @@ app.use(cors())
 
 //! routes
 app.use('/api/users', usersRoutes)
-
-
-
-
-
-//! utils or helper functions
-
-
 
 
 
@@ -83,11 +73,10 @@ const usersSchemaValidation = zod.object({
 //! interfaces and types start
 // ===================================
 
-
-type TFullName = zod.infer<typeof fullNameSchemaValidation>
-type TAddress = zod.infer<typeof addressSchemaValidation>
-type TOrders = zod.infer<typeof ordersSchemaValidation>
 type TUsers = zod.infer<typeof usersSchemaValidation>
+type TOrders = zod.infer<typeof ordersSchemaValidation>
+type TAddress = zod.infer<typeof addressSchemaValidation>
+type TFullName = zod.infer<typeof fullNameSchemaValidation>
 
 
 
@@ -212,7 +201,6 @@ const UserSchema = new Schema<TUsers, IUsersModel>({
 
 
 UserSchema.statics.isUserExist = async function (userId: number): Promise<TUsers | Pick<TUsers, "orders"> | null> {
-
     return await User.findOne({ userId })
 }
 
