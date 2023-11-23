@@ -35,18 +35,18 @@ app.use('/api/users', usersRoutes)
 // =============================================================
 
 const fullNameSchemaValidation = zod.object({
-    firstName: zod.string().min(3, { message: 'Please enter first name at least 3 digits' }).max(15, { message: 'First name cannot be more than 15 digits' }).trim(),
-    lastName: zod.string().min(3, { message: 'Please enter last name at least 3 digits' }).max(15, { message: 'First name cannot be more than 15 digits' }).trim(),
+    firstName: zod.string().min(3, { message: 'Please enter first name at least 3 characters' }).max(15, { message: 'First name cannot be more than 15 characters' }).trim(),
+    lastName: zod.string().min(3, { message: 'Please enter last name at least 3 characters' }).max(15, { message: 'First name cannot be more than 15 characters' }).trim(),
 })
 
 const addressSchemaValidation = zod.object({
-    street: zod.string().min(3, { message: 'Please enter street at least 3 digits' }).max(15, { message: 'Street cannot be more than 15 digits' }).trim(),
-    city: zod.string().min(3, { message: 'Please enter city at least 3 digits' }).max(15, { message: 'City cannot be more than 15 digits' }).trim(),
-    country: zod.string().min(3, { message: 'Please enter country at least 3 digits' }).max(15, { message: 'Country cannot be more than 15 digits' }).trim(),
+    street: zod.string().min(3, { message: 'Please enter street at least 3 characters' }).max(15, { message: 'Street cannot be more than 15 characters' }).trim(),
+    city: zod.string().min(3, { message: 'Please enter city at least 3 characters' }).max(15, { message: 'City cannot be more than 15 characters' }).trim(),
+    country: zod.string().min(3, { message: 'Please enter country at least 3 characters' }).max(15, { message: 'Country cannot be more than 15 characters' }).trim(),
 })
 
 const ordersSchemaValidation = zod.object({
-    productName: zod.string().min(3, { message: 'Please enter product name at least 3 digits' }).max(40, { message: 'Product name cannot be more than 40 digits' }).trim(),
+    productName: zod.string().min(3, { message: 'Please enter product name at least 3 characters' }).max(40, { message: 'Product name cannot be more than 40 characters' }).trim(),
     price: zod.number().min(1, { message: 'Please enter price at least 1 digits' }),
     quantity: zod.number().min(1, { message: 'Please enter quantity at least 1 digits' })
 })
@@ -54,7 +54,7 @@ const ordersSchemaValidation = zod.object({
 const usersSchemaValidation = zod.object({
     userId: zod.number(),
     username: zod.string().min(3, { message: 'Please enter username at least 3 character' }).max(15, { message: 'Username cannot be more than 15 characters' }).trim(),
-    password: zod.string().min(3, { message: 'Please enter password at least 6 characters' }).max(16, { message: 'Password cannot be more than 16 characters' }),
+    password: zod.string().min(6, { message: 'Please enter password at least 6 characters' }).max(16, { message: 'Password cannot be more than 16 characters' }),
     fullName: fullNameSchemaValidation,
     age: zod.number().min(1, { message: 'Please enter age at least 1 digits' }),
     email: zod.string().email({ message: 'Invalid email address' }).trim().toLowerCase(),
@@ -451,6 +451,7 @@ usersRoutes.get('/:userId/orders', async (req: Request, res: Response, next: Nex
 })
 
 
+// !get all orders total price for specified user
 usersRoutes.get('/:userId/orders/total-price', async (req: Request, res: Response, next: NextFunction) => {
     try {
         const userId = Number(req.params.userId)
@@ -468,32 +469,13 @@ usersRoutes.get('/:userId/orders/total-price', async (req: Request, res: Respons
         }
 
 
-        const [userOrders] = await User.aggregate([
-            {
-                $match: { userId }
-            },
-            {
-                $unwind: '$orders'
-            },
-            {
-                $group: {
-                    _id: null,
-                    totalOrdersPrice: { $sum: '$orders.price' }
-                }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    totalOrdersPrice: 1
-                }
-            }
-        ])
+        const totalPrice: number | undefined = user.orders?.reduce((total, currentElement) => currentElement.price * currentElement.quantity + total, 0)
 
 
         return res.send({
             success: true,
-            message: `user's orders total price fetch successfully`,
-            data: userOrders
+            message: `user's orders total price calculate successfully`,
+            data: { totalPrice }
 
         })
     } catch (error) {
@@ -501,6 +483,64 @@ usersRoutes.get('/:userId/orders/total-price', async (req: Request, res: Respons
     }
 })
 
+
+
+
+//! add single user order api
+usersRoutes.put('/:userId/orders', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.params.userId
+        const { orders }: Partial<Pick<TUsers, "orders">> = req.body
+        const isExist = await User.isUserExist(Number(userId))
+
+        const validated = ordersSchemaValidation.safeParse(orders)
+
+        if (!validated.success) {
+            return res.status(400).json({
+                success: false,
+                message: 'Failed to create order',
+                error: {
+                    code: 400,
+                    description: "Please check product name,quantity and price"
+                }
+            })
+        }
+
+        if (!isExist) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+                error: {
+                    code: 404,
+                    description: 'User not found'
+                }
+            })
+        }
+
+        const updatedUser = await User.findOneAndUpdate(
+            {
+                userId
+            },
+            {
+                $push: {
+                    orders,
+                }
+            },
+            {
+                runValidators: true,
+                new: true
+            })
+
+        return res.status(200).json({
+            success: true,
+            message: 'User updated successfully',
+            data: updatedUser
+        })
+
+    } catch (error) {
+        next(error)
+    }
+})
 
 
 
