@@ -1,6 +1,7 @@
 import zod from "zod"
 import cors from "cors"
 import express, { Request, Response, Router } from "express"
+import { Model, Schema, model } from "mongoose"
 
 
 const app = express()
@@ -74,11 +75,148 @@ type TOrders = zod.infer<typeof ordersSchemaValidation>
 type TUsers = zod.infer<typeof usersSchemaValidation>
 
 
+
+interface IUsersModel extends Model<TUsers> {
+    isUserExist(userId: string): Promise<TUsers | null>
+}
+
+
 // ===================================
 //! interfaces and types end
 // ===================================
 
+//!--------------------------------------------------------------------------------------------------------------------
 
+// ===================================
+//! mongoose schema & models start
+// ===================================
+
+const FullNameSchema = new Schema<TFullName>({
+    firstName: {
+        type: 'String',
+        required: [true, 'Please check your first name fields.'],
+        min: [3, 'First name must be at least 3 characters.'],
+        max: [20, 'First name cannot be more than 20 characters.'],
+        trim: true,
+    },
+    lastName: {
+        type: 'String',
+        required: [true, 'Please check your first name fields.'],
+        min: [3, 'Last name must be at least 3 characters.'],
+        max: [20, 'Last name cannot be more than 20 characters.'],
+        trim: true,
+    }
+});
+
+
+const AddressSchema = new Schema<TAddress>({
+    city: {
+        type: 'String',
+        required: [true, 'Please check your city fields.'],
+        min: [3, 'City must be at least 3 characters.'],
+        max: [20, 'City cannot be more than 20 characters.'],
+        trim: true,
+    },
+    country: {
+        type: 'String',
+        required: [true, 'Please check your country fields.'],
+        min: [3, 'Country must be at least 3 characters.'],
+        max: [20, 'Country cannot be more than 20 characters.'],
+        trim: true,
+    },
+    street: {
+        type: 'String',
+        required: [true, 'Please check your street fields.'],
+        min: [3, 'Street must be at least 3 characters.'],
+        max: [20, 'Street cannot be more than 20 characters.'],
+        trim: true,
+    }
+});
+
+const OrdersSchema = new Schema<TOrders>({
+    price: {
+        type: 'Number',
+        required: [true, 'Please check your price field.'],
+        min: [1, 'Price must be at least 1 digits.'],
+    },
+    quantity: {
+        type: 'Number',
+        required: [true, 'Please check your quantity field.'],
+        min: [1, 'Quantity must be at least 1 digits.'],
+    },
+    productName: {
+        type: 'String',
+        required: [true, 'Please check your product name field.'],
+        min: [3, 'Street must be at least 3 characters.'],
+        max: [40, 'Street cannot be more than 20 characters.'],
+        trim: true,
+    },
+})
+
+
+const UserSchema = new Schema<TUsers, IUsersModel>({
+    userId: {
+        type: 'Number',
+        required: [true, 'Please check your user id fields.'],
+        min: [3, 'User id must be at least 3 digits.'],
+        max: [5, 'User id cannot be more than 5 digits.'],
+        unique: true,
+    },
+    username: {
+        type: 'String',
+        required: [true, 'Please check your username fields.'],
+        min: [3, 'User id must be at least 3 digits.'],
+        trim: true,
+        unique: true,
+    },
+    email: {
+        type: 'String',
+        unique: true,
+        required: [true, 'Please check your email fields.'],
+        trim: true,
+    },
+    password: {
+        type: 'String',
+        required: [true, 'Please check your password fields.'],
+        min: [3, 'Password must be at least 6 digits.'],
+        max: [16, 'Password cannot be more than 16 digits.'],
+    },
+    fullName: FullNameSchema,
+    age: {
+        type: 'Number',
+        required: [true, 'Please check your age fields.'],
+        min: [1, 'Please check your age fields.'],
+    },
+    isActive: {
+        type: 'Boolean',
+        required: [true, 'Please check your active fields.'],
+    },
+    hobbies: {
+        type: ['String'],
+        required: [true, 'Please check your hobbies fields.'],
+    },
+    address: AddressSchema,
+    orders: [OrdersSchema]
+})
+
+
+UserSchema.statics.isUserExist = async function (userId: string): Promise<TUsers | null> {
+
+    return await User.findOne({ userId })
+
+}
+
+
+
+
+
+const User = model<TUsers, IUsersModel>('User', UserSchema)
+
+
+
+// ===================================
+//! mongoose schema & models end
+// ===================================
 
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!')
@@ -92,8 +230,14 @@ usersRoutes.post('/', (req: Request, res: Response) => {
 usersRoutes.get('/', (req: Request, res: Response) => {
     return res.send('Hello World! from users GET request find method')
 })
-usersRoutes.get('/:userId', (req: Request, res: Response) => {
-    return res.send('Hello World! from users GET request find single user method')
+usersRoutes.get('/:userId', async (req: Request, res: Response) => {
+    const userId = req.params.userId
+    const isUserExist = await User.isUserExist(userId)
+    return res.send({
+        success: true,
+        message: 'user fetch successfully',
+        data: isUserExist
+    })
 })
 usersRoutes.put('/:userId', (req: Request, res: Response) => {
     return res.send('Hello World! from users GET request update single user method')
