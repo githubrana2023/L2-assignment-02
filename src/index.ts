@@ -5,6 +5,7 @@ import express, { NextFunction, Request, Response, Router } from "express"
 import dotenv from "dotenv"
 import mongoose, { Model, Query, Schema, model } from "mongoose"
 import { Document } from "mongodb"
+import { idText } from "typescript"
 
 
 
@@ -210,7 +211,8 @@ const UserSchema = new Schema<TUsers, IUsersModel>({
 })
 
 
-UserSchema.statics.isUserExist = async function (userId: number): Promise<TUsers | null> {
+UserSchema.statics.isUserExist = async function (userId: number): Promise<TUsers | Pick<TUsers, "orders"> | null> {
+
     return await User.findOne({ userId })
 }
 
@@ -411,17 +413,96 @@ usersRoutes.delete('/:userId', async (req: Request, res: Response, next: NextFun
 })
 
 
-// !api for orders
-usersRoutes.put('/:userId/orders', (req: Request, res: Response) => {
-    return res.send('Hello World! from users GET request update single user orders array method')
+// !get all orders for specified user
+usersRoutes.get('/:userId/orders', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = Number(req.params.userId)
+        const user = await User.isUserExist(userId)
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+                error: {
+                    code: 404,
+                    description: 'User not found'
+                }
+            })
+        }
+
+
+        const [userOrders] = await User.aggregate([
+            {
+                $match: { userId }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    orders: 1
+                }
+            }
+        ])
+
+
+        return res.send({
+            success: true,
+            message: `user's orders fetch successfully`,
+            data: userOrders
+        })
+    } catch (error) {
+        next(error)
+    }
 })
 
-usersRoutes.get('/:userId/orders', (req: Request, res: Response) => {
-    return res.send('Hello World! from users GET request find single user all orders method')
-})
 
-usersRoutes.get('/:userId/orders/total-price', (req: Request, res: Response) => {
-    return res.send('Hello World! from users GET request find single user total order price method')
+usersRoutes.get('/:userId/orders/total-price', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = Number(req.params.userId)
+        const user = await User.isUserExist(Number(userId))
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+                error: {
+                    code: 404,
+                    description: 'User not found'
+                }
+            })
+        }
+
+
+        const [userOrders] = await User.aggregate([
+            {
+                $match: { userId }
+            },
+            {
+                $unwind: '$orders'
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalOrdersPrice: { $sum: '$orders.price' }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    totalOrdersPrice: 1
+                }
+            }
+        ])
+
+
+        return res.send({
+            success: true,
+            message: `user's orders total price fetch successfully`,
+            data: userOrders
+
+        })
+    } catch (error) {
+        next(error)
+    }
 })
 
 
