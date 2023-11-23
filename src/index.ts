@@ -3,7 +3,8 @@ import cors from "cors"
 import bcrypt from "bcryptjs"
 import express, { NextFunction, Request, Response, Router } from "express"
 import dotenv from "dotenv"
-import mongoose, { Model, Schema, model } from "mongoose"
+import mongoose, { Model, Query, Schema, model } from "mongoose"
+import { Document } from "mongodb"
 
 
 
@@ -44,7 +45,7 @@ app.use('/api/users', usersRoutes)
 
 const fullNameSchemaValidation = zod.object({
     firstName: zod.string().min(3, { message: 'Please enter first name at least 3 digits' }).max(15, { message: 'First name cannot be more than 15 digits' }).trim(),
-    lastName: zod.string().min(3, { message: 'Please enter first name at least 3 digits' }).max(15, { message: 'First name cannot be more than 15 digits' }).trim(),
+    lastName: zod.string().min(3, { message: 'Please enter last name at least 3 digits' }).max(15, { message: 'First name cannot be more than 15 digits' }).trim(),
 })
 
 const addressSchemaValidation = zod.object({
@@ -90,7 +91,7 @@ type TUsers = zod.infer<typeof usersSchemaValidation>
 
 
 interface IUsersModel extends Model<TUsers> {
-    isUserExist(email: string): Promise<TUsers | null>
+    isUserExist(userId: number): Promise<TUsers | null>
 }
 
 
@@ -114,13 +115,12 @@ const FullNameSchema = new Schema<TFullName>({
     },
     lastName: {
         type: 'String',
-        required: [true, 'Please check your first name fields.'],
+        required: [true, 'Please check your last name fields.'],
         min: [3, 'Last name must be at least 3 characters.'],
         max: [20, 'Last name cannot be more than 20 characters.'],
         trim: true,
     }
-});
-
+}, { _id: false });
 
 const AddressSchema = new Schema<TAddress>({
     city: {
@@ -144,7 +144,7 @@ const AddressSchema = new Schema<TAddress>({
         max: [20, 'Street cannot be more than 20 characters.'],
         trim: true,
     }
-});
+}, { _id: false });
 
 const OrdersSchema = new Schema<TOrders>({
     price: {
@@ -164,8 +164,7 @@ const OrdersSchema = new Schema<TOrders>({
         max: [40, 'Street cannot be more than 20 characters.'],
         trim: true,
     },
-})
-
+}, { _id: false })
 
 const UserSchema = new Schema<TUsers, IUsersModel>({
     userId: {
@@ -211,8 +210,8 @@ const UserSchema = new Schema<TUsers, IUsersModel>({
 })
 
 
-UserSchema.statics.isUserExist = async function (email: string): Promise<TUsers | null> {
-    return await User.findOne({ email })
+UserSchema.statics.isUserExist = async function (userId: number): Promise<TUsers | null> {
+    return await User.findOne({ userId })
 }
 
 //! mongoose pre middleware
@@ -223,7 +222,12 @@ UserSchema.pre('save', async function () {
     this.password = hashedPassword
 })
 
-
+UserSchema.pre(/^find/, function (this: Query<TUsers, Document>, next) {
+    this.find({
+        isActive: true
+    }).projection({ password: 0 })
+    next()
+})
 
 
 const User = model<TUsers, IUsersModel>('User', UserSchema)
@@ -239,9 +243,8 @@ app.get('/', (req: Request, res: Response) => {
 })
 
 
-
+//! create user api
 usersRoutes.post('/', async (req: Request, res: Response, next: NextFunction) => {
-
     try {
         const userData: TUsers = req.body
         const validated = usersSchemaValidation.safeParse(userData)
@@ -257,7 +260,7 @@ usersRoutes.post('/', async (req: Request, res: Response, next: NextFunction) =>
             })
         }
 
-        const isExist = await User.isUserExist(userData.email)
+        const isExist = await User.isUserExist(validated.data.userId)
 
         if (isExist) {
             return res.status(200).json({
@@ -280,31 +283,131 @@ usersRoutes.post('/', async (req: Request, res: Response, next: NextFunction) =>
     } catch (error) {
         next(error)
     }
-
-
-
-
-
-
-
 })
-usersRoutes.get('/', (req: Request, res: Response) => {
-    return res.send('Hello World! from users GET request find method')
+
+
+
+//! get all users api
+usersRoutes.get('/', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const response = await User.find()
+        return res.status(200).json({
+            success: true,
+            message: 'Users fetched successfully',
+            data: response
+        })
+    } catch (error) {
+        next(error)
+    }
 })
-usersRoutes.get('/:userId', async (req: Request, res: Response) => {
-    const userId = req.params.userId
-    const isUserExist = await User.isUserExist(userId)
-    return res.send({
-        success: true,
-        message: 'user fetch successfully',
-        data: isUserExist
-    })
+
+
+//! get single user api
+usersRoutes.get('/:userId', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.params.userId
+        const isExist = await User.isUserExist(Number(userId))
+
+        if (!isExist) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+                error: {
+                    code: 404,
+                    description: 'User not found'
+                }
+            })
+        }
+
+        return res.send({
+            success: true,
+            message: 'user fetch successfully',
+            data: isExist
+        })
+    } catch (error) {
+        next(error)
+    }
 })
-usersRoutes.put('/:userId', (req: Request, res: Response) => {
-    return res.send('Hello World! from users GET request update single user method')
+
+
+//! update single user api
+usersRoutes.put('/:userId', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.params.userId
+        const { fullName, hobbies, orders, address, ...remaining }: Partial<TUsers> = req.body
+        const isExist = await User.isUserExist(Number(userId))
+
+        if (!isExist) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+                error: {
+                    code: 404,
+                    description: 'User not found'
+                }
+            })
+        }
+
+        const updatedUser = await User.findOneAndUpdate(
+            {
+                userId
+            },
+            {
+                $push: {
+                    orders,
+                    hobbies,
+                },
+                $set: {
+                    fullName,
+                    address,
+                    ...remaining
+                }
+
+            },
+            {
+                runValidators: true,
+                new: true
+            })
+
+        return res.status(200).json({
+            success: false,
+            message: 'User updated successfully',
+            data: updatedUser
+        })
+
+    } catch (error) {
+        next(error)
+    }
 })
-usersRoutes.delete('/:userID', (req: Request, res: Response) => {
-    return res.send('Hello World! from users GET request delete single user method')
+
+
+//! delete single user api
+usersRoutes.delete('/:userId', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const userId = req.params.userId
+        const isExist = await User.isUserExist(Number(userId))
+
+        if (!isExist) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+                error: {
+                    code: 404,
+                    description: 'User not found'
+                }
+            })
+        }
+
+        const deletedUser = await User.deleteOne({ userId })
+
+        return res.send({
+            success: true,
+            message: 'user successfully permanently delete',
+            data: deletedUser
+        })
+    } catch (error) {
+        next(error)
+    }
 })
 
 
