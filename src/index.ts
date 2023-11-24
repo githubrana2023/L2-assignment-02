@@ -408,7 +408,8 @@ usersRoutes.delete('/:userId', async (req: Request, res: Response, next: NextFun
         return res.send({
             success: true,
             message: 'user successfully permanently delete',
-            data: deletedUser
+            result: deletedUser,
+            data: null
         })
     } catch (error) {
         next(error)
