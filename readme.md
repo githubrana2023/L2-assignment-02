@@ -138,10 +138,10 @@ Make an .env file
 To run this project, you will need to add the following environment variables to your .env file
 
 ```
-`PORT`
+PORT
 ```
 ```
-`MONGODB_URL`
+MONGODB_URL
 ```
 
 Start the server
