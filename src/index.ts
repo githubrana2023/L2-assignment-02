@@ -6,7 +6,6 @@ import dotenv from "dotenv"
 import mongoose, { Model, Query, Schema, model, Document } from "mongoose"
 
 
-
 dotenv.config()
 
 
@@ -14,6 +13,7 @@ const app = express()
 
 
 const mongodb_url = process.env.MONGODB_URL as string
+// const mongodb_url_local = 'mongodb://localhost:27017/test_db'
 const port = process.env.PORT as string || 5000
 
 
@@ -236,7 +236,7 @@ const User = model<TUsers, IUsersModel>('User', UserSchema)
 // =============================================================
 
 
-app.get('/', (req: Request, res: Response,next:NextFunction) => {
+app.get('/', (req: Request, res: Response, next: NextFunction) => {
     try {
         return res.status(200).json({
             success: true,
@@ -540,7 +540,7 @@ usersRoutes.put('/:userId/orders', async (req: Request, res: Response, next: Nex
 
         return res.status(200).json({
             success: true,
-            message: 'User updated successfully',
+            message: 'Order added successfully',
             data: updatedUser
         })
 
@@ -560,7 +560,7 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
         "message": error.message || 'something went wrong',
         "error": {
             "code": 500,
-            "description": "internal error"
+            "description": "something went wrong",
         }
     })
 })
@@ -570,6 +570,8 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
 // =============================================================
 
 //!--------------------------------------------------------------------------------------------------------------------
+
+
 
 
 // =============================================================
@@ -582,7 +584,7 @@ const connectDb = async () => {
         app.listen(port, () => {
             console.log({
                 db: 'database connection established with server',
-                server: `server listening on port ${port}`
+                server: `server listening on port ${port}`,
             })
         })
     } catch (error) {
